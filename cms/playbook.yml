@@ -111,12 +111,6 @@
         dest: "{{ deploy_dir }}/repo/{{ repo_subdir }}/.env"
         mode: "0640"
 
-    - name: Render db/.db.env with vault password
-      ansible.builtin.template:
-        src: db.env.j2
-        dest: "{{ deploy_dir }}/repo/{{ repo_subdir }}/db/.db.env"
-        mode: "0640"
-
     # --- Запуск Docker Compose (идемпотентно) ---
     - name: Start docker compose stack
       community.docker.docker_compose_v2:

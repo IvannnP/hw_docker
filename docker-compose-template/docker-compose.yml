@@ -1,11 +1,10 @@
 services:
   db:
     image: postgres:15-alpine
-    env_file:
-      - db/.db.env
     environment:
       POSTGRES_USER: postgres
       POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
