@@ -20,6 +20,7 @@ services:
     command: python seed_db.py
     environment:
       DB_HOST: db
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     depends_on:
       db:
         condition: service_healthy
@@ -29,6 +30,7 @@ services:
       context: backend
     environment:
       DB_HOST: db
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     depends_on:
       init:
         condition: service_completed_successfully
@@ -42,7 +44,7 @@ services:
     build:
       context: frontend
     ports:
-      - "8189:80"
+      - "${HOST_PORT:-8189}:80"
     depends_on:
       backend:
         condition: service_healthy

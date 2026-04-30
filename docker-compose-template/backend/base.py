@@ -5,7 +5,8 @@ from sqlalchemy.orm import sessionmaker
 import os
 
 HOST = os.environ.get('DB_HOST', 'localhost')
-SQLALCHEMY_DATABASE_URL = f"postgresql://postgres:postgres@{HOST}/postgres"
+PASSWORD = os.environ.get('POSTGRES_PASSWORD', 'postgres')
+SQLALCHEMY_DATABASE_URL = f"postgresql://postgres:{PASSWORD}@{HOST}/postgres"
 
 
 engine = create_engine(
