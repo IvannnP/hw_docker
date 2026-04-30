@@ -3,10 +3,11 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 import os
+from urllib.parse import quote_plus
 
 HOST = os.environ.get('DB_HOST', 'localhost')
 PASSWORD = os.environ.get('POSTGRES_PASSWORD', 'postgres')
-SQLALCHEMY_DATABASE_URL = f"postgresql://postgres:{PASSWORD}@{HOST}/postgres"
+SQLALCHEMY_DATABASE_URL = f"postgresql://postgres:{quote_plus(PASSWORD)}@{HOST}/postgres"
 
 
 engine = create_engine(
