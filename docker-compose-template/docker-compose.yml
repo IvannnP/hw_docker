@@ -35,7 +35,7 @@ services:
       init:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/ || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/users || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 10
