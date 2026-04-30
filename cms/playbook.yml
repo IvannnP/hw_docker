@@ -101,8 +101,8 @@
         repo: "{{ repo_url }}"
         dest: "{{ deploy_dir }}/repo"
         version: "{{ repo_version }}"
-        force: true
         update: true
+      register: git_clone
 
     # --- Конфигурация: .env и .db.env через templates ---
     - name: Render top-level .env (HOST_PORT, project name, password)
@@ -123,9 +123,10 @@
         project_src: "{{ deploy_dir }}/repo/{{ repo_subdir }}"
         project_name: "{{ compose_project }}"
         state: present
-        build: policy
+        build: always
         pull: missing
         remove_orphans: true
+        recreate: auto
 
     - name: Show external URL
       ansible.builtin.debug:
