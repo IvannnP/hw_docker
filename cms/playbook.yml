@@ -104,12 +104,21 @@
         update: true
       register: git_clone
 
-    # --- Конфигурация: .env и .db.env через templates ---
+    # --- Конфигурация: .env через template ---
     - name: Render top-level .env (HOST_PORT, project name, password)
       ansible.builtin.template:
         src: .env.j2
         dest: "{{ deploy_dir }}/repo/{{ repo_subdir }}/.env"
         mode: "0640"
+
+    # --- Если git pull принёс новые коммиты — сносим кэш образов, чтобы compose их пересобрал ---
+    - name: Drop cached project images so policy build triggers when source changed
+      ansible.builtin.command:
+        cmd: "docker image rm -f {{ compose_project }}-backend {{ compose_project }}-frontend {{ compose_project }}-init"
+      when: git_clone.changed
+      register: image_drop
+      changed_when: image_drop.rc == 0
+      failed_when: false
 
     # --- Запуск Docker Compose (идемпотентно) ---
     - name: Start docker compose stack
@@ -117,7 +126,7 @@
         project_src: "{{ deploy_dir }}/repo/{{ repo_subdir }}"
         project_name: "{{ compose_project }}"
         state: present
-        build: always
+        build: policy
         pull: missing
         remove_orphans: true
         recreate: auto
