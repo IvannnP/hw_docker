@@ -38,7 +38,7 @@ app = FastAPI()
 
 @app.get('/', response_class=HTMLResponse)
 def get(request: Request):
-    return templates.TemplateResponse('index.html', {"request": request})
+    return templates.TemplateResponse(request, 'index.html', {})
 
 def get_db():
     db = SessionLocal()
@@ -57,7 +57,7 @@ def get_users_api(db: Session = Depends(get_db)):
 def get_users(
     request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse(
-        'users.html', {"request": request, "users": db.query(User).all()}
+        request, 'users.html', {"users": db.query(User).all()}
     )
 
 
