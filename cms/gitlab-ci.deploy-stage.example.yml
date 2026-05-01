@@ -1,0 +1,33 @@
+# Пример Deploy-стадии для пайплайна Delivery.
+# Скопируй этот блок в свой .gitlab-ci.yml (он лежит в репозитории Delivery).
+# В переменных проекта GitLab нужно завести:
+#   - VAULT_PASSWORD (тип File или Variable, значение: secret)
+#   - SSH_PRIVATE_KEY (тип File) — ключ для пользователя на ai.hse.akhcheck.ru
+#   - SSH_USER        (Variable) — имя пользователя на сервере
+
+stages:
+  - install
+  - test
+  - deploy   # <-- последняя стадия
+
+Deploy:
+  stage: deploy
+  image: python:3.11-slim
+  tags:
+    - python3
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends openssh-client git
+    - pip install --no-cache-dir ansible
+    - ansible-galaxy collection install -r cms/requirements.yml
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - cp "$SSH_PRIVATE_KEY" ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan -H ai.hse.akhcheck.ru >> ~/.ssh/known_hosts
+  script:
+    - cd cms
+    - ansible-playbook -i inventory.ini playbook.yml
+        --vault-password-file "$VAULT_PASSWORD"
+        --extra-vars "ansible_user=$SSH_USER ansible_ssh_private_key_file=~/.ssh/id_rsa"
+  only:
+    - master
+    - main
+    - task-ansible

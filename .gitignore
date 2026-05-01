@@ -1,2 +1,5 @@
 *.pyc
 *.sqlite3
+
+# Generated on the deploy host by the Ansible playbook (cms/playbook.yml)
+docker-compose-template/.env

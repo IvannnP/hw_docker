@@ -1,0 +1,18 @@
+---
+# === Параметры деплоя ===
+user_id: 92                                      # порт = 20000 + user_id  (логин ai2026-hse-092)
+repo_url: "https://github.com/IvannnP/hw_docker.git"
+repo_version: "task-ansible"                     # ветка с docker-compose
+repo_subdir: "docker-compose-template"           # путь внутри репозитория, где лежит compose
+deploy_dir: "{{ ansible_env.HOME }}/cms-{{ user_id }}"   # домашний каталог пользователя
+compose_project: "cms{{ user_id }}"              # уникальное имя docker-compose project'а
+nginx_host_port: "{{ 20000 + (user_id | int) }}" # внешний порт Nginx на хосте
+
+# === Зашифровано через `ansible-vault encrypt_string` (пароль: secret) ===
+postgres_password: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          33396165343961323164366132313532653231316236623936396465613237393330376263646532
+          3535633830636265663230336334643736323238643730660a323861633737666237326235303931
+          64323465363865633562363332613065373838373566323638333762353335353462303331393034
+          6636666166643264340a326638313632356166383762663335393664656364306534633637616338
+          39616466333364373730626338663264356237366230333532653337333562663263

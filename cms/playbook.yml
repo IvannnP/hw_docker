@@ -1,0 +1,148 @@
+---
+- name: Deploy CMS (Nginx + PostgreSQL + FastAPI) via Docker Compose
+  hosts: cms
+  become: false
+  gather_facts: true
+
+  pre_tasks:
+    - name: Assert user_id is set
+      ansible.builtin.assert:
+        that:
+          - user_id is defined
+          - (user_id | int) > 0
+        fail_msg: "В group_vars/all.yml нужно прописать свой user_id (не 0)."
+
+    - name: Check whether Docker engine is already installed
+      ansible.builtin.command: docker --version
+      register: docker_present
+      changed_when: false
+      failed_when: false
+
+    - name: Check whether Docker compose plugin is available
+      ansible.builtin.command: docker compose version
+      register: compose_present
+      changed_when: false
+      failed_when: false
+
+  tasks:
+    # --- Установка Docker нужна только если на сервере его нет (требует sudo) ---
+    - name: Install Docker engine and compose plugin (requires root)
+      become: true
+      when: docker_present.rc != 0 or compose_present.rc != 0
+      block:
+        - name: Install apt prerequisites
+          ansible.builtin.apt:
+            name:
+              - ca-certificates
+              - curl
+              - gnupg
+            state: present
+            update_cache: true
+            cache_valid_time: 3600
+
+        - name: Ensure /etc/apt/keyrings exists
+          ansible.builtin.file:
+            path: /etc/apt/keyrings
+            state: directory
+            mode: "0755"
+
+        - name: Download Docker GPG key
+          ansible.builtin.get_url:
+            url: https://download.docker.com/linux/ubuntu/gpg
+            dest: /etc/apt/keyrings/docker.gpg
+            mode: "0644"
+            force: false
+
+        - name: Add Docker apt repository
+          ansible.builtin.copy:
+            dest: /etc/apt/sources.list.d/docker.list
+            mode: "0644"
+            content: |
+              deb [arch={{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+          register: docker_repo
+
+        - name: Update apt cache after repo change
+          ansible.builtin.apt:
+            update_cache: true
+          when: docker_repo.changed
+          changed_when: false
+
+        - name: Install Docker engine and compose plugin
+          ansible.builtin.apt:
+            name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+              - docker-buildx-plugin
+              - docker-compose-plugin
+            state: present
+
+        - name: Ensure docker service is running and enabled
+          ansible.builtin.systemd:
+            name: docker
+            state: started
+            enabled: true
+
+        - name: Add current user to docker group
+          ansible.builtin.user:
+            name: "{{ ansible_user }}"
+            groups: docker
+            append: true
+
+    # --- Подготовка каталога и клонирование репозитория ---
+    - name: Ensure deploy directory exists
+      ansible.builtin.file:
+        path: "{{ deploy_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Clone / update application repository
+      ansible.builtin.git:
+        repo: "{{ repo_url }}"
+        dest: "{{ deploy_dir }}/repo"
+        version: "{{ repo_version }}"
+        update: true
+      register: git_clone
+
+    # --- Конфигурация: .env через template ---
+    - name: Render top-level .env (HOST_PORT, project name, password)
+      ansible.builtin.template:
+        src: .env.j2
+        dest: "{{ deploy_dir }}/repo/{{ repo_subdir }}/.env"
+        mode: "0640"
+      register: env_render
+
+    # --- Если git pull принёс новые коммиты — сносим кэш образов, чтобы compose их пересобрал ---
+    - name: Drop cached project images so policy build triggers when source changed
+      ansible.builtin.command:
+        cmd: "docker image rm -f {{ compose_project }}-backend {{ compose_project }}-frontend {{ compose_project }}-init"
+      when: git_clone.changed
+      register: image_drop
+      changed_when: image_drop.rc == 0
+      failed_when: false
+
+    # --- Идемпотентная проверка запущенных сервисов ---
+    - name: Count running long-running services for the project (db/backend/frontend)
+      ansible.builtin.command:
+        cmd: "docker compose --project-name {{ compose_project }} ps --status running -q"
+      register: running_ps
+      changed_when: false
+
+    # --- Запуск Docker Compose только когда что-то реально поменялось или сервисы лежат ---
+    - name: Start docker compose stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ deploy_dir }}/repo/{{ repo_subdir }}"
+        project_name: "{{ compose_project }}"
+        state: present
+        build: policy
+        pull: missing
+        remove_orphans: true
+        recreate: auto
+      when: >
+        git_clone.changed
+        or env_render.changed
+        or (running_ps.stdout_lines | length) < 3
+
+    - name: Show external URL
+      ansible.builtin.debug:
+        msg: "CMS доступен на http://{{ inventory_hostname }}:{{ nginx_host_port }}"
